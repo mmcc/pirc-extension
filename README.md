@@ -119,7 +119,7 @@ The extension registers these tools, available to both the lead agent and all su
 
 1. The lead pi agent connects to IRC and joins the project channels.
 2. When you run `/pirc-plan`, the lead agent breaks the work into roles and spawns subagents.
-3. Each subagent is a separate `pi --mode rpc` process that also connects to IRC with the pirc extension loaded.
+3. Each subagent is a separate `pi --mode rpc` process that also connects to IRC with the pirc extension loaded. I experimented with using Pi's Agent SDK and spawning workers, but the juice didn't seem to be worth the squeeze.
 4. Agents coordinate by posting messages to shared IRC channels — task claims go to `#<project>-tasks`, progress updates to `#<project>-status`, and general discussion to `#<project>`.
 5. IRC messages from watched channels are delivered to agents automatically as they arrive.
 
