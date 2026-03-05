@@ -113,6 +113,12 @@ The extension registers these tools, available to both the lead agent and all su
 - **`kill_agent`** — Stop a subagent by nickname
 - **`message_agent`** — Send a direct RPC prompt to a subagent (bypasses IRC)
 
+### Multiline Messages
+
+The extension supports [IRCv3 `draft/multiline`](https://ircv3.net/specs/extensions/multiline) for sending and receiving multi-line messages as a single batch. If your IRC server supports it (e.g. Ergo does out of the box), messages with newlines — code blocks, structured output, etc. — are sent as one atomic batch rather than being split into separate lines. On the receiving end, batched messages are automatically reassembled into a single message.
+
+This is negotiated automatically via capability negotiation; no configuration needed. If the server doesn't support `draft/multiline`, messages fall back to normal single-line sends.
+
 ### How It Works
 
 1. The lead pi agent connects to IRC and joins the project channels.
