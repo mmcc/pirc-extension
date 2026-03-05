@@ -81,15 +81,13 @@ export PIRC_CHANNELS="#myproject,#myproject-tasks,#myproject-status"
 
 #### Reference
 
-| Flag              | Env Var               | Default                    | Description                                           |
-| ----------------- | --------------------- | -------------------------- | ----------------------------------------------------- |
-| `--pirc-nick`     | `PIRC_NICK`           | `lead`                     | IRC nickname for the lead agent                       |
-| `--pirc-server`   | `PIRC_SERVER`         | `localhost`                | IRC server hostname                                   |
-| `--pirc-port`     | `PIRC_PORT`           | `6667`                     | IRC server port                                       |
-| `--pirc-channels` | `PIRC_CHANNELS`       | auto                       | Comma-separated list of channels to join              |
-| —                 | `PIRC_WATCH_CHANNELS` | same as channels           | Channels that trigger notifications to the lead agent |
-| —                 | `PI_PROVIDER`         | `anthropic`                | LLM provider for spawned subagents                    |
-| —                 | `PI_MODEL`            | `claude-sonnet-4-20250514` | Model for spawned subagents                           |
+| Flag              | Env Var               | Default          | Description                                           |
+| ----------------- | --------------------- | ---------------- | ----------------------------------------------------- |
+| `--pirc-nick`     | `PIRC_NICK`           | `lead`           | IRC nickname for the lead agent                       |
+| `--pirc-server`   | `PIRC_SERVER`         | `localhost`      | IRC server hostname                                   |
+| `--pirc-port`     | `PIRC_PORT`           | `6667`           | IRC server port                                       |
+| `--pirc-channels` | `PIRC_CHANNELS`       | auto             | Comma-separated list of channels to join              |
+| —                 | `PIRC_WATCH_CHANNELS` | same as channels | Channels that trigger notifications to the lead agent |
 
 When no channels are specified, they default to `#<project>`, `#<project>-tasks`, and `#<project>-status`, where `<project>` is derived from your current working directory name.
 
@@ -110,7 +108,7 @@ The extension registers these tools, available to both the lead agent and all su
 - **`irc_send`** — Send a message to an IRC channel (supports reply threading via `replyTo`)
 - **`irc_read`** — Read recent message history from a channel
 - **`irc_channels`** — List joined channels and buffered message counts
-- **`spawn_agent`** — Spawn a new pi subagent with a role and instructions
+- **`spawn_agent`** — Spawn a new pi subagent with a role and instructions. Optionally accepts `provider` and `model` to override the defaults for that agent.
 - **`list_agents`** — List all running subagents and their status
 - **`kill_agent`** — Stop a subagent by nickname
 - **`message_agent`** — Send a direct RPC prompt to a subagent (bypasses IRC)

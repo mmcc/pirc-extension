@@ -258,10 +258,24 @@ export default function (pi: ExtensionAPI): void {
               "Working directory for the agent (default: current directory). The agent has full file access here.",
           }),
         ),
+        provider: Type.Optional(
+          Type.String({
+            description:
+              "LLM provider for this agent (e.g. 'anthropic', 'openai'). Defaults to the lead agent's provider.",
+          }),
+        ),
+        model: Type.Optional(
+          Type.String({
+            description:
+              "Model for this agent (e.g. 'claude-sonnet-4-20250514', 'gpt-4o'). Defaults to the lead agent's model.",
+          }),
+        ),
       }),
     ),
     async execute(_toolCallId, params) {
       const workdir = params.workdir ?? process.cwd();
+      const agentProvider = params.provider ?? provider;
+      const agentModel = params.model ?? model;
 
       const bootPrompt = `# Your Role: ${params.role}
 
@@ -299,8 +313,8 @@ Begin now.`;
             channels: [...defaultChannels],
             cwd: workdir,
             extensionPath,
-            provider,
-            model,
+            provider: agentProvider,
+            model: agentModel,
             server,
             port,
             bootPrompt,
