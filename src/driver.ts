@@ -29,7 +29,7 @@ export interface AgentHandle {
   sendPrompt(message: string): Promise<RpcResponse>;
 }
 
-interface RpcResponse {
+export interface RpcResponse {
   readonly id: string;
   readonly success: boolean;
   readonly error?: string;
@@ -54,6 +54,53 @@ function send(agent: AgentProcess, obj: Record<string, unknown>): Promise<RpcRes
   return new Promise((resolve) => {
     agent.pending.set(id, resolve);
   });
+}
+
+function rejectPending(agent: AgentProcess, reason: string): void {
+  for (const [id, resolve] of agent.pending) {
+    resolve({ id, success: false, error: reason });
+  }
+  agent.pending.clear();
+}
+
+function makeHandle(agent: AgentProcess): AgentHandle {
+  return {
+    nick: agent.config.nick,
+    role: agent.config.role,
+    get pid() {
+      return agent.proc.pid ?? -1;
+    },
+    get alive() {
+      return agent.alive;
+    },
+    kill() {
+      agent.alive = false;
+      rejectPending(agent, "Agent killed");
+      agent.proc.kill();
+      agents.delete(agent.config.nick);
+    },
+    sendPrompt(message: string) {
+      if (!agent.alive) {
+        return Promise.resolve({
+          id: "",
+          success: false,
+          error: "Agent is not alive",
+        });
+      }
+      return send(agent, { type: "prompt", message });
+    },
+  };
+}
+
+async function waitForReady(agent: AgentProcess, timeoutMs = 15000): Promise<void> {
+  const start = Date.now();
+  while (agent.alive && Date.now() - start < timeoutMs) {
+    const resp = await send(agent, { type: "get_state" });
+    if (resp.success) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  if (!agent.alive) throw new Error("Agent died during startup");
+  throw new Error("Agent failed to become ready within timeout");
 }
 
 export function spawnAgent(
@@ -145,88 +192,42 @@ export function spawnAgent(
 
   proc.on("exit", (code: number | null) => {
     agent.alive = false;
+    rejectPending(agent, `Agent exited with code ${String(code)}`);
     agents.delete(config.nick);
     log(`Exited with code ${String(code)}`);
   });
 
   agents.set(config.nick, agent);
 
-  // Send boot prompt after a delay for startup
-  setTimeout(() => {
-    void send(agent, { type: "prompt", message: config.bootPrompt }).then((resp) => {
+  // Wait for the RPC process to be ready, then send boot prompt
+  void waitForReady(agent)
+    .then(() => send(agent, { type: "prompt", message: config.bootPrompt }))
+    .then((resp) => {
       if (!resp.success) {
         log(`Boot prompt failed: ${JSON.stringify(resp)}`);
       }
+    })
+    .catch((err: unknown) => {
+      log(`Startup failed: ${String(err)}`);
     });
-  }, 3000);
 
-  return {
-    nick: config.nick,
-    role: config.role,
-    get pid() {
-      return proc.pid ?? -1;
-    },
-    get alive() {
-      return agent.alive;
-    },
-    kill() {
-      agent.alive = false;
-      proc.kill();
-      agents.delete(config.nick);
-    },
-    sendPrompt(message: string) {
-      return send(agent, { type: "prompt", message });
-    },
-  };
+  return makeHandle(agent);
 }
 
 export function getAgent(nick: string): AgentHandle | undefined {
   const agent = agents.get(nick);
   if (!agent) return undefined;
-  return {
-    nick: agent.config.nick,
-    role: agent.config.role,
-    get pid() {
-      return agent.proc.pid ?? -1;
-    },
-    get alive() {
-      return agent.alive;
-    },
-    kill() {
-      agent.alive = false;
-      agent.proc.kill();
-      agents.delete(nick);
-    },
-    sendPrompt(message: string) {
-      return send(agent, { type: "prompt", message });
-    },
-  };
+  return makeHandle(agent);
 }
 
 export function listAgents(): readonly AgentHandle[] {
-  return [...agents.values()].map((agent) => ({
-    nick: agent.config.nick,
-    role: agent.config.role,
-    get pid() {
-      return agent.proc.pid ?? -1;
-    },
-    get alive() {
-      return agent.alive;
-    },
-    kill() {
-      agent.alive = false;
-      agent.proc.kill();
-      agents.delete(agent.config.nick);
-    },
-    sendPrompt(message: string) {
-      return send(agent, { type: "prompt", message });
-    },
-  }));
+  return [...agents.values()].map(makeHandle);
 }
 
 export function killAll(): void {
   for (const [nick, agent] of agents) {
     agent.alive = false;
+    rejectPending(agent, "All agents killed");
     agent.proc.kill();
     agents.delete(nick);
   }
