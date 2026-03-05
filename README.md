@@ -4,7 +4,7 @@ A [pi](https://pi.dev) extension that decomposes work into IRC-coordinated subag
 
 This is more of a silly experiment rather than something serious. I think there's a lot of promise, and I'm enjoying getting to use IRC again, but I make no guarantees that this is "good" or even a remotely reasonable idea. _Please_ don't subject any public IRC servers to your bots.
 
-I _have_ started using this as just an interface with Pi, even without the subagent stuff, by just chatting with the `lead` in IRC. My setup is that I run the IRC server + Pi session on a small NUC in my basement, then connect to IRC via Tailscale from other devices so I can continue sessions on the go. That part, at the very least, is pretty neat.
+I _have_ started using this as just an interface with Pi, even without the subagent stuff, by just chatting with the lead agent in IRC. My setup is that I run the IRC server + Pi session on a small NUC in my basement, then connect to IRC via Tailscale from other devices so I can continue sessions on the go. That part, at the very least, is pretty neat.
 
 ## Quick Start
 
@@ -66,7 +66,7 @@ Configuration is via CLI flags (preferred) or environment variables (fallback). 
 pi -e /path/to/pirc-extension \
   --pirc-server localhost \
   --pirc-port 6667 \
-  --pirc-nick lead \
+  --pirc-nick myproject-lead \
   --pirc-channels "#myproject,#myproject-tasks,#myproject-status"
 ```
 
@@ -75,7 +75,7 @@ pi -e /path/to/pirc-extension \
 ```bash
 export PIRC_SERVER=localhost
 export PIRC_PORT=6667
-export PIRC_NICK=lead
+export PIRC_NICK=myproject-lead
 export PIRC_CHANNELS="#myproject,#myproject-tasks,#myproject-status"
 ```
 
@@ -83,13 +83,13 @@ export PIRC_CHANNELS="#myproject,#myproject-tasks,#myproject-status"
 
 | Flag              | Env Var               | Default          | Description                                           |
 | ----------------- | --------------------- | ---------------- | ----------------------------------------------------- |
-| `--pirc-nick`     | `PIRC_NICK`           | `lead`           | IRC nickname for the lead agent                       |
+| `--pirc-nick`     | `PIRC_NICK`           | `<project>-lead` | IRC nickname for the lead agent                       |
 | `--pirc-server`   | `PIRC_SERVER`         | `localhost`      | IRC server hostname                                   |
 | `--pirc-port`     | `PIRC_PORT`           | `6667`           | IRC server port                                       |
 | `--pirc-channels` | `PIRC_CHANNELS`       | auto             | Comma-separated list of channels to join              |
 | —                 | `PIRC_WATCH_CHANNELS` | same as channels | Channels that trigger notifications to the lead agent |
 
-When no channels are specified, they default to `#<project>`, `#<project>-tasks`, and `#<project>-status`, where `<project>` is derived from your current working directory name.
+The `<project>` name is derived from your current working directory name. When no nick is specified, it defaults to `<project>-lead`. When no channels are specified, they default to `#<project>`, `#<project>-tasks`, and `#<project>-status`.
 
 ## Usage
 
