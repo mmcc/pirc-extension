@@ -22,7 +22,6 @@ export default function (pi: ExtensionAPI): void {
   const MAX_HISTORY = 200;
 
   // --- Configuration ---
-  const nick = process.env["PIRC_NICK"] ?? "lead";
   const server = process.env["PIRC_SERVER"] ?? "localhost";
   const port = parseInt(process.env["PIRC_PORT"] ?? "6667", 10);
   const provider = process.env["PI_PROVIDER"] ?? "anthropic";
@@ -33,6 +32,8 @@ export default function (pi: ExtensionAPI): void {
     .basename(process.cwd())
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, "-");
+
+  const nick = process.env["PIRC_NICK"] ?? `${projectName}-lead`;
   const mainChannel = `#${projectName}`;
 
   // Default channels: project channel + coordination channels
