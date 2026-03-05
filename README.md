@@ -131,4 +131,4 @@ pi -e /path/to/pirc-extension --pirc-server localhost --pirc-port 6667
 /pirc-plan Build a REST API with user auth and a test suite
 ```
 
-The lead agent will spawn workers like `myproject-api-builder`, `myproject-auth`, `myproject-tester` — each with specific instructions — and they'll coordinate over IRC to build it out.
+The lead agent will spawn workers like `myproject-api-builder`, `myproject-auth`, `myproject-tester`, each with specific instructions, and they'll coordinate over IRC to build it out.
