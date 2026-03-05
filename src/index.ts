@@ -3,6 +3,14 @@ import { Type, type TSchema } from "@sinclair/typebox";
 import { Client } from "irc-framework";
 import path from "node:path";
 import { spawnAgent, listAgents, getAgent, killAll, type AgentHandle } from "./driver.js";
+import {
+  parseMultilineCap,
+  startMultilineBatch,
+  collectMultilineLine,
+  endMultilineBatch,
+  buildMultilineBatch,
+  type MultilineCaps,
+} from "./multiline.js";
 
 interface BufferedMessage {
   readonly time: string;
@@ -49,6 +57,7 @@ export default function (pi: ExtensionAPI): void {
   // --- IRC State ---
   let irc: Client = new Client();
   let connected = false;
+  let multilineCaps: MultilineCaps | undefined;
   const history: Record<string, BufferedMessage[]> = {};
 
   const watchChannels = new Set(
@@ -90,10 +99,24 @@ export default function (pi: ExtensionAPI): void {
     if (connected) return;
 
     irc = new Client();
+    irc.requestCap(["batch", "draft/multiline", "message-tags"]);
     irc.connect({ host: server, port, nick });
 
     irc.on("registered", () => {
       connected = true;
+
+      // Check if multiline was negotiated
+      const capValue = irc.network.cap.available.get("draft/multiline");
+      if (irc.network.cap.isEnabled("draft/multiline") && capValue) {
+        multilineCaps = parseMultilineCap(capValue);
+        onNotify(
+          `IRC: multiline enabled (max-bytes=${String(multilineCaps.maxBytes)}, max-lines=${String(multilineCaps.maxLines ?? "unlimited")})`,
+          "info",
+        );
+      } else {
+        multilineCaps = undefined;
+      }
+
       for (const ch of defaultChannels) {
         irc.join(ch);
       }
@@ -103,11 +126,71 @@ export default function (pi: ExtensionAPI): void {
       );
     });
 
+    // Handle multiline batch lifecycle
+    irc.on("batch start draft/multiline", (event: unknown) => {
+      try {
+        const evt = event as { id: string; params: string[] };
+        startMultilineBatch(evt.id, evt.params[0] ?? "");
+      } catch (err) {
+        onNotify(`IRC multiline batch start error: ${String(err)}`, "error");
+      }
+    });
+
+    irc.on("batch end draft/multiline", (event: unknown) => {
+      try {
+        const evt = event as { id: string };
+        const assembled = endMultilineBatch(evt.id);
+        if (!assembled) return;
+
+        const msg: BufferedMessage = {
+          time: now(),
+          nick: assembled.nick,
+          channel: assembled.target,
+          text: assembled.text,
+          msgid: assembled.tags["msgid"],
+          replyTo: assembled.tags["+draft/reply"] ?? assembled.tags["draft/reply"],
+        };
+        pushMessage(msg);
+
+        if (watchChannels.has(msg.channel)) {
+          const replyCtx = msg.replyTo ? ` (reply to ${msg.replyTo})` : "";
+          const idCtx = msg.msgid ? ` [id:${msg.msgid}]` : "";
+          pi.sendMessage(
+            {
+              customType: "pirc-message",
+              content: `[IRC ${msg.channel}] <${msg.nick}>${replyCtx} ${msg.text}${idCtx}`,
+              display: true,
+            },
+            { triggerTurn: true, deliverAs: "followUp" },
+          );
+        }
+      } catch (err) {
+        onNotify(`IRC multiline batch end error: ${String(err)}`, "error");
+      }
+    });
+
     irc.on("message", (event: unknown) => {
       const evt = event as Record<string, unknown>;
       if (evt["nick"] === nick) return;
 
+      // If this message is part of a multiline batch, collect it instead
       const tags = (evt["tags"] ?? {}) as Record<string, string>;
+      try {
+        const batch = evt["batch"] as { id: string; type: string } | undefined;
+        if (
+          collectMultilineLine({
+            batch,
+            nick: evt["nick"] as string,
+            message: evt["message"] as string,
+            tags,
+          })
+        ) {
+          return;
+        }
+      } catch {
+        // Fall through to normal message handling
+      }
+
       const msg: BufferedMessage = {
         time: now(),
         nick: evt["nick"] as string,
@@ -181,7 +264,29 @@ export default function (pi: ExtensionAPI): void {
       if (params.replyTo) {
         tags["+draft/reply"] = params.replyTo;
       }
-      irc.say(params.channel, params.message, Object.keys(tags).length > 0 ? tags : undefined);
+
+      // Try multiline batch if the server supports it and message needs it
+      let sentMultiline = false;
+      if (multilineCaps) {
+        const batch = buildMultilineBatch(
+          params.channel,
+          params.message,
+          multilineCaps,
+          350,
+          Object.keys(tags).length > 0 ? tags : undefined,
+        );
+        if (batch) {
+          for (const line of batch) {
+            irc.raw(line.raw);
+          }
+          sentMultiline = true;
+        }
+      }
+
+      if (!sentMultiline) {
+        irc.say(params.channel, params.message, Object.keys(tags).length > 0 ? tags : undefined);
+      }
+
       const replyNote = params.replyTo ? ` (reply to ${params.replyTo})` : "";
       return {
         content: [
